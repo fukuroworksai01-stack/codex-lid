@@ -5,12 +5,26 @@
 [![CI](https://github.com/fukuroworksai01-stack/codex-lid/actions/workflows/ci.yml/badge.svg)](https://github.com/fukuroworksai01-stack/codex-lid/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-MacBookの蓋を閉じたあとも、Codexやローカルビルドを**指定時間だけ**継続させるmacOSメニューバーアプリです。
+MacBookの蓋を閉じたあとも、ローカルで実行中のCodexタスクやビルドを**指定時間だけ**継続させるmacOSメニューバーアプリです。
 
-OpenAI/Codexの非公式コミュニティツールです。Codex APIへの接続や、Codexの操作自体は行いません。
+OpenAI/Codexの非公式コミュニティツールです。Codex API、Remoteの通信、Codexの操作自体には関与しません。
 
 > [!WARNING]
 > 実験的なアルファ版です。CodexだけでなくMac全体のスリープを一時的に無効化します。閉じたMacをバッグ、ケース、布団など放熱できない場所へ入れないでください。
+
+> [!IMPORTANT]
+> **Codex LidだけではCodex Remoteの接続は維持できません。** [OpenAIのRemote接続ガイド](https://learn.chatgpt.com/docs/remote-connections)では、MacBookの蓋を閉じてRemoteを使う場合、電源に加えて外部ディスプレイの接続も必要と案内されています。外部ディスプレイがない場合は、蓋を開けたまま画面だけを消してください。
+
+## Codex Remoteで使う場合
+
+Codex Lidが担当するのはmacOSのスリープ禁止だけです。ChatGPT Desktopの認証済み接続、ネットワーク、再接続は制御しません。
+
+- ChatGPT Desktopを最新版にし、Remote設定の「Keep this Mac awake」を有効にする
+- Macを電源と安定したネットワークへ接続する
+- 外部ディスプレイなし：蓋を開けたまま、Codex Lidの「Remote向け：蓋を開けたまま画面を消す」を使う
+- 蓋を閉じる：上記に加えて、外部ディスプレイを接続する
+
+アプリは内蔵画面以外のアクティブなディスプレイを開始前に補助検出します。ディスプレイの種類や公式条件への適合、Remote接続の成功は保証しません。
 
 ## 特徴
 
@@ -54,12 +68,18 @@ cd codex-lid
 2. 電源アダプタを接続し、Macを硬く平らな場所へ置きます。
 3. メニューバーの月アイコンから、初回は「5分テスト」を選びます。
 4. 内容を確認してmacOSの管理者認証を行います。
-5. 「画面を消してロック」を押してから蓋を閉じます。
-6. 再度蓋を開き、作業結果と通常スリープへの復旧を確認します。
+5. ローカル処理の蓋閉じテストをする場合だけ、画面を消して蓋を閉じます。Remoteで外部ディスプレイがない場合は、蓋を開けたままにします。
+6. テスト後に、作業結果と通常スリープへの復旧を確認します。
 
 アプリを終了しても独立監視は指定時間まで残ります。早く戻す場合は「停止して通常スリープへ戻す」を選びます。
 
 ## 状態確認と緊急復旧
+
+インストール済みの版、実行場所、電源、スリープ、外部ディスプレイの状態は、読み取り専用の診断スクリプトで確認できます。ネットワーク通信や統合ログの収集は行いません。
+
+```bash
+./scripts/diagnose.sh
+```
 
 ```bash
 pmset -g | grep SleepDisabled
@@ -76,6 +96,8 @@ sudo "/Library/Application Support/Codex Lid/Codex Lid.app/Contents/Resources/Co
 ## 重要な制限
 
 - `pmset disablesleep`は`pmset(1)`に掲載されていないmacOSの非公開設定です。OS更新後は必ず5分テストから始めてください。
+- Codex LidはRemoteのWebSocket、認証、ネットワーク、再接続を操作しません。Macが起きていてもRemoteが切断される場合があります。
+- 外部ディスプレイを接続せずにMacBookの蓋を閉じるRemote運用は、OpenAIの公式条件外です。
 - Codexが確認・承認待ち、ネットワーク待ち、入力待ちになれば処理はそこで止まります。
 - MacBook Airはファンレスです。閉じた状態で高負荷レンダリングを続ける用途には向きません。
 - コンパイル、自己テスト、アプリ起動はM1 MacBook Airで確認しています。機種とOSの組み合わせごとに、実作業前の短時間テストが必要です。

@@ -2,12 +2,26 @@
 
 [日本語 README](README.md)
 
-Codex Lid is an experimental macOS menu-bar app that keeps local Codex runs and builds working for a **strictly limited time** after a MacBook lid is closed.
+Codex Lid is an experimental macOS menu-bar app that keeps local Codex tasks and builds working for a **strictly limited time** after a MacBook lid is closed.
 
-This is an unofficial community project and is not affiliated with OpenAI. It does not connect to the Codex API or control Codex itself.
+This is an unofficial community project and is not affiliated with OpenAI. It does not connect to the Codex API, manage Remote transport, or control Codex itself.
 
 > [!WARNING]
 > This app temporarily disables sleep for the whole Mac, not just Codex. Never put a closed, awake Mac in a bag, case, bed, or any place that traps heat.
+
+> [!IMPORTANT]
+> **Codex Lid alone cannot keep a Codex Remote connection alive.** The [official OpenAI Remote connections guide](https://learn.chatgpt.com/docs/remote-connections) says that using Remote with a Mac laptop lid closed also requires an external display in addition to power. Without an external display, keep the lid open and turn off only the screen.
+
+## Using Codex Remote
+
+Codex Lid controls only macOS sleep. It does not control ChatGPT Desktop's authenticated transport, networking, or reconnection.
+
+- Keep ChatGPT Desktop current and enable **Keep this Mac awake** in its Remote settings.
+- Connect the Mac to power and a stable network.
+- Without an external display: keep the lid open and use **Remote: keep lid open and turn off display** in Codex Lid.
+- With the lid closed: also connect an external display.
+
+Before a session starts, the app reports whether it detects an active non-built-in display. It cannot verify the display type, compliance with the documented requirement, or a successful Remote connection.
 
 ## Highlights
 
@@ -49,12 +63,18 @@ The app is first built at `dist/Codex Lid.app`. The installer places the complet
 2. Connect power and put the Mac on a hard, flat, ventilated surface.
 3. Choose the 5-minute test from the moon icon in the menu bar.
 4. Review the warning and approve the macOS administrator prompt.
-5. Choose **Lock and turn off display**, then close the lid.
-6. Reopen the lid and verify both the task result and return to normal sleep.
+5. Close the lid only when testing a local task. For Remote without an external display, leave the lid open and turn off only the screen.
+6. After the test, verify both the task result and return to normal sleep.
 
 To stop early, choose **Stop and restore normal sleep**. The independent monitor remains active until the deadline even if the menu-bar UI quits.
 
 ## Recovery
+
+Run the read-only diagnostic script to report installed copies, versions, power, sleep, and display state. It performs no network request and does not collect the unified log.
+
+```bash
+./scripts/diagnose.sh
+```
 
 Check the system-wide state with:
 
@@ -73,6 +93,8 @@ If the protected worker cannot run, use `sudo pmset -a disablesleep 0` as the la
 ## Important limitations
 
 - `pmset disablesleep` is an undocumented macOS setting and may change. Run the 5-minute test after every major OS update.
+- Codex Lid does not control Remote's WebSocket, authentication, networking, or reconnection. Remote can disconnect even while the Mac remains awake.
+- Closing a Mac laptop lid for Remote without an external display is outside OpenAI's documented requirements.
 - Codex can still pause for approval, input, networking, or another external dependency.
 - Fanless MacBook Air models are not suitable for sustained high-load work in a closed-lid configuration.
 - Compilation, self-tests, and app launch have been checked on an M1 MacBook Air. Test your exact hardware and OS combination before real work.

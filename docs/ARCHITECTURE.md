@@ -36,6 +36,8 @@ Root-only coordination files live in `/var/run`:
 
 No credentials or Codex task contents are written by Codex Lid.
 
+The menu-bar UI queries Core Graphics for active displays only to show an advisory warning. Display detection never changes the worker's safety checks or claims that a Remote connection is healthy. `scripts/diagnose.sh` is read-only and reports local installation, power, sleep, and display metadata; it makes no network requests and does not collect the unified log.
+
 ## Session lifecycle
 
 1. The UI rejects a start if system-wide sleep is already disabled.
@@ -70,6 +72,8 @@ Out of scope:
 - a compromised source tree or build process at the moment the user intentionally installs it with administrator privileges
 - hardware, firmware, or macOS failures that prevent the reset command from running
 - guaranteeing that Codex itself will not pause for input or approval
+- maintaining, authenticating, or reconnecting Codex Remote transport
+- supporting closed-lid Codex Remote use without an external display
 
 ## Known tradeoffs
 

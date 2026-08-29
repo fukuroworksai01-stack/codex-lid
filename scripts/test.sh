@@ -10,6 +10,7 @@ EXPECTED_WORKER_PATH="/Library/Application Support/Codex Lid/Codex Lid.app/Conte
 
 /bin/bash -n \
   "$SCRIPT_DIR/build.sh" \
+  "$SCRIPT_DIR/diagnose.sh" \
   "$SCRIPT_DIR/install.sh" \
   "$SCRIPT_DIR/test.sh" \
   "$SCRIPT_DIR/uninstall.sh"
@@ -19,6 +20,9 @@ EXPECTED_WORKER_PATH="/Library/Application Support/Codex Lid/Codex Lid.app/Conte
 /usr/bin/plutil -lint "$APP_DIR/Contents/Info.plist"
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_DIR/Contents/Info.plist")" \
   == "com.fukuroworks.codexlid" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_DIR/Contents/Info.plist")" \
+  == "0.2.1" ]]
+[[ -x "$SCRIPT_DIR/diagnose.sh" ]]
 /usr/bin/codesign --verify --deep --strict "$APP_DIR"
 /usr/bin/file "$APP_DIR/Contents/MacOS/Codex Lid"
 /usr/bin/file "$WORKER"
@@ -39,6 +43,11 @@ fi
 
 if /usr/bin/grep -Eq 'https?://|curl|URLSession' "$STRINGS_REPORT"; then
   echo "Unexpected network-related string found" >&2
+  exit 1
+fi
+
+if /usr/bin/grep -Eq 'https?://|curl|URLSession' "$SCRIPT_DIR/diagnose.sh"; then
+  echo "Unexpected network operation found in diagnostic script" >&2
   exit 1
 fi
 

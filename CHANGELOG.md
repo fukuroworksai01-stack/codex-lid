@@ -4,6 +4,15 @@ All notable changes are documented here.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-30
+
+- Clarified that Codex Lid controls macOS sleep but does not maintain Codex Remote transport.
+- Added an advisory external-display check and Remote-specific guidance before timed sessions.
+- Added first-launch guidance for the supported lid-open Remote workflow.
+- Displayed the running app version, path, and protected-install status in the menu.
+- Added a read-only diagnostic script for installed copies, power, sleep, and display state.
+- Documented OpenAI's external-display requirement for closed-lid Remote use.
+
 ## [0.2.0] - 2026-08-30
 
 - Hardened the user/root runtime boundary with exact paths, no-follow opens, descriptor-based directory validation, and link-count checks.
@@ -26,5 +35,6 @@ All notable changes are documented here.
 - Rejected stale status/PID combinations in the menu-bar UI.
 - Added bilingual documentation, security policy, architecture notes, CI, and an MIT license.
 
-[Unreleased]: https://github.com/fukuroworksai01-stack/codex-lid/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/fukuroworksai01-stack/codex-lid/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/fukuroworksai01-stack/codex-lid/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/fukuroworksai01-stack/codex-lid/tree/v0.2.0

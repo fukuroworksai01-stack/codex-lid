@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import Darwin
 import Foundation
 
@@ -22,6 +23,12 @@ private enum SleepSettingState {
   case unknown
 }
 
+private enum ExternalDisplayState {
+  case present
+  case absent
+  case unknown
+}
+
 @MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private let uid = getuid()
@@ -29,6 +36,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
   private lazy var statusPath = runtimeDirectory + "/status.json"
   private lazy var stopPath = runtimeDirectory + "/stop.request"
   private let maximumStatusBytes = 16 * 1024
+  private let remoteScopeNoticeKey = "didShowRemoteScopeNotice-v0.2.1"
   private let activeSessionPath = "/var/run/com.fukuroworks.codexlid.active"
   private let protectedAppPath =
     "/Library/Application Support/Codex Lid/Codex Lid.app"
@@ -56,9 +64,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
   private let stopItem = NSMenuItem(
     title: "停止して通常スリープへ戻す", action: #selector(stopSession), keyEquivalent: "")
   private let lockItem = NSMenuItem(
-    title: "画面を消してロック", action: #selector(lockScreen), keyEquivalent: "l")
+    title: "Remote向け：蓋を開けたまま画面を消す", action: #selector(lockScreen), keyEquivalent: "l")
   private let emergencyResetItem = NSMenuItem(
     title: "緊急復旧：スリープ設定を戻す…", action: #selector(emergencyReset), keyEquivalent: "")
+  private let remoteRequirementsItem = NSMenuItem(
+    title: "Codex Remoteの利用条件…", action: #selector(showRemoteRequirements), keyEquivalent: "")
+  private let installationItem = NSMenuItem(
+    title: "", action: #selector(showInstallationInfo), keyEquivalent: "")
 
   private var allowBattery: Bool {
     get { UserDefaults.standard.bool(forKey: "allowBattery") }
@@ -72,6 +84,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     buildMenu()
     configureStatusItem()
     refresh()
+    DispatchQueue.main.async { [weak self] in self?.showFirstRunNoticeIfNeeded() }
     refreshTimer = Timer.scheduledTimer(
       timeInterval: 1.0,
       target: self,
@@ -118,7 +131,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     remainingItem.isEnabled = false
     let actionItems = [
       start5Item, start30Item, start60Item, start120Item, batteryItem, stopItem, lockItem,
-      emergencyResetItem,
+      emergencyResetItem, remoteRequirementsItem, installationItem,
     ]
     for item in actionItems {
       item.target = self
@@ -148,6 +161,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
       title: "安全上の注意", action: #selector(showSafetyNotes), keyEquivalent: "")
     aboutItem.target = self
     menu.addItem(aboutItem)
+    menu.addItem(remoteRequirementsItem)
+    menu.addItem(installationItem)
 
     let quitItem = NSMenuItem(title: "Codex Lidを終了", action: #selector(quitApp), keyEquivalent: "q")
     quitItem.target = self
@@ -157,7 +172,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
   private func configureStatusItem() {
     statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     statusItem.menu = menu
-    updateIcon(active: false, warning: false)
+    updateIcon(active: false, transitioning: false, warning: false)
   }
 
   func menuWillOpen(_ menu: NSMenu) {
@@ -218,22 +233,37 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     batteryItem.state = allowBattery ? .on : .off
     stopItem.isEnabled = workerRunning
     emergencyResetItem.isHidden = !warning
-    updateIcon(active: workerRunning, warning: warning || settingUnknown)
+    installationItem.title =
+      "Codex Lid v\(appVersion())・\(privilegedWorkerReady ? "保護版" : "未保護のコピー")"
+    updateIcon(
+      active: workerActive,
+      transitioning: workerRunning && !workerActive,
+      warning: warning || settingUnknown)
   }
 
-  private func updateIcon(active: Bool, warning: Bool) {
+  private func updateIcon(active: Bool, transitioning: Bool, warning: Bool) {
     let symbol: String
     if warning {
       symbol = "exclamationmark.triangle.fill"
     } else if active {
       symbol = "bolt.circle.fill"
+    } else if transitioning {
+      symbol = "clock"
     } else {
       symbol = "moon.zzz"
     }
     let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Codex Lid")
     image?.isTemplate = true
     statusItem?.button?.image = image
-    statusItem?.button?.toolTip = active ? "Codex Lid：蓋を閉じても動作中" : "Codex Lid：通常スリープ"
+    if warning {
+      statusItem?.button?.toolTip = "Codex Lid：確認が必要です"
+    } else if active {
+      statusItem?.button?.toolTip = "Codex Lid：Macのスリープ禁止中（Remoteは別条件）"
+    } else if transitioning {
+      statusItem?.button?.toolTip = "Codex Lid：開始・停止処理中"
+    } else {
+      statusItem?.button?.toolTip = "Codex Lid：通常スリープ"
+    }
   }
 
   @objc private func start5() { startSession(minutes: 5) }
@@ -266,14 +296,29 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
       return
     }
 
-    let alert = NSAlert()
-    alert.alertStyle = .warning
-    alert.messageText = "\(minutes)分間、蓋を閉じても動作を続けます"
-    alert.informativeText =
+    let displayState = externalDisplayState()
+    let remoteNotice: String
+    switch displayState {
+    case .present:
+      remoteNotice =
+        "内蔵画面以外のアクティブなディスプレイを検出しました。種類や公式条件への適合は確認できません。蓋を閉じたCodex Remoteには電源接続も必要で、接続維持を保証するものではありません。"
+    case .absent:
+      remoteNotice =
+        "外部ディスプレイを検出できません。OpenAIの公式案内では、MacBookの蓋を閉じてRemoteを使うには外部ディスプレイも必要です。このセッションはMacのスリープだけを禁止します。"
+    case .unknown:
+      remoteNotice =
+        "外部ディスプレイの状態を確認できません。Codex LidはMacのスリープだけを制御し、Remote接続の維持は保証しません。"
+    }
+    let safetyNotice =
       allowBattery
       ? "机など放熱できる場所に置いてください。バッグや布団の中では絶対に使わないでください。バッテリー25%または高温で自動停止します。"
       : "電源接続中だけ動作します。机など放熱できる場所に置き、バッグや布団の中では絶対に使わないでください。"
-    alert.addButton(withTitle: "開始")
+
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    alert.messageText = "\(minutes)分間、Macのスリープを禁止します"
+    alert.informativeText = remoteNotice + "\n\n" + safetyNotice
+    alert.addButton(withTitle: "スリープ禁止を開始")
     alert.addButton(withTitle: "キャンセル")
     guard alert.runModal() == .alertFirstButtonReturn else { return }
 
@@ -394,9 +439,54 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     let alert = NSAlert()
     alert.messageText = "Codex Lidの安全上の注意"
     alert.informativeText =
-      "・閉じたMacは通常スリープより多く電力を使います。\n・必ず硬く平らな場所で使ってください。\n・バッグ、ケース、布団の中では使用禁止です。\n・高温、低バッテリー、電源切断、タイマー終了で自動解除します。\n・pmset disablesleepはmacOSの非公開設定のため、OS更新後は短時間テストしてください。"
+      "・閉じたMacは通常スリープより多く電力を使います。\n・必ず硬く平らな場所で使ってください。\n・バッグ、ケース、布団の中では使用禁止です。\n・高温、低バッテリー、電源切断、タイマー終了で自動解除します。\n・Codex LidはRemote接続を操作・保証しません。\n・蓋を閉じたRemoteには、OpenAIの公式案内どおり外部ディスプレイも必要です。\n・pmset disablesleepはmacOSの非公開設定のため、OS更新後は短時間テストしてください。"
     alert.addButton(withTitle: "OK")
     alert.runModal()
+  }
+
+  @objc private func showRemoteRequirements() {
+    let displayDescription: String
+    switch externalDisplayState() {
+    case .present:
+      displayDescription = "現在：内蔵画面以外のアクティブなディスプレイを検出しました。種類や公式条件への適合は未確認です。"
+    case .absent:
+      displayDescription = "現在：外部ディスプレイを検出できません。"
+    case .unknown:
+      displayDescription = "現在：外部ディスプレイの状態を確認できません。"
+    }
+
+    let alert = NSAlert()
+    alert.messageText = "Codex Remoteは別の接続条件があります"
+    alert.informativeText =
+      "Codex Lidが制御するのはMac全体のスリープだけです。Remoteの通信、認証、再接続は操作しません。\n\n蓋を開けて使う：電源とネットワークを接続し、ChatGPTの「Keep this Mac awake」を有効にします。\n\n蓋を閉じて使う：上記に加えて外部ディスプレイが必要です。\n\n外部ディスプレイがない場合は、蓋を開けたままメニューの「Remote向け：蓋を開けたまま画面を消す」を使うのが推奨です。\n\n\(displayDescription)"
+    alert.addButton(withTitle: "OK")
+    alert.runModal()
+  }
+
+  @objc private func showInstallationInfo() {
+    let installationDescription =
+      privilegedWorkerReady
+      ? "保護されたインストールから実行中です。時間制限付きセッションを開始できます。"
+      : "未保護のコピーから実行中です。時間制限付きセッションは開始できません。最新版のscripts/install.sh --replaceでインストールしてください。"
+    let alert = NSAlert()
+    alert.messageText = "Codex Lid v\(appVersion())"
+    alert.informativeText =
+      "\(installationDescription)\n\n実行場所：\n\(Bundle.main.bundlePath)"
+    alert.addButton(withTitle: "OK")
+    alert.runModal()
+  }
+
+  private func showFirstRunNoticeIfNeeded() {
+    guard !UserDefaults.standard.bool(forKey: remoteScopeNoticeKey) else { return }
+
+    let alert = NSAlert()
+    alert.alertStyle = .informational
+    alert.messageText = "起動しただけではスリープ禁止になりません"
+    alert.informativeText =
+      "メニューバーの月アイコンから、時間制限付きセッションを選んでください。\n\nCodex Lidが制御するのはMacのスリープだけです。蓋を閉じたCodex Remoteには外部ディスプレイも必要です。外部ディスプレイがない場合は、蓋を開けたまま画面だけを消してください。"
+    alert.addButton(withTitle: "確認しました")
+    alert.runModal()
+    UserDefaults.standard.set(true, forKey: remoteScopeNoticeKey)
   }
 
   @objc private func quitApp() {
@@ -478,6 +568,26 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
   private func currentPowerSource() -> String {
     runCapture("/usr/bin/pmset", ["-g", "batt"]).contains("AC Power") ? "ac" : "battery"
+  }
+
+  private func externalDisplayState() -> ExternalDisplayState {
+    var displayCount: UInt32 = 0
+    guard CGGetActiveDisplayList(0, nil, &displayCount) == .success else { return .unknown }
+    guard displayCount > 0 else { return .absent }
+
+    let capacity = displayCount
+    var activeCount = displayCount
+    var displays = [CGDirectDisplayID](repeating: 0, count: Int(capacity))
+    let result = displays.withUnsafeMutableBufferPointer { buffer in
+      CGGetActiveDisplayList(capacity, buffer.baseAddress, &activeCount)
+    }
+    guard result == .success, activeCount <= capacity else { return .unknown }
+    return displays.prefix(Int(activeCount)).contains { CGDisplayIsBuiltin($0) == 0 }
+      ? .present : .absent
+  }
+
+  private func appVersion() -> String {
+    Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "不明"
   }
 
   private func processIsAlive(_ pid: Int32) -> Bool {
