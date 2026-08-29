@@ -21,7 +21,7 @@ EXPECTED_WORKER_PATH="/Library/Application Support/Codex Lid/Codex Lid.app/Conte
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_DIR/Contents/Info.plist")" \
   == "com.fukuroworks.codexlid" ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_DIR/Contents/Info.plist")" \
-  == "0.2.1" ]]
+  == "0.2.2" ]]
 [[ -x "$SCRIPT_DIR/diagnose.sh" ]]
 /usr/bin/codesign --verify --deep --strict "$APP_DIR"
 /usr/bin/file "$APP_DIR/Contents/MacOS/Codex Lid"

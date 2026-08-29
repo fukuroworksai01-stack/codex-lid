@@ -4,6 +4,10 @@ All notable changes are documented here.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-30
+
+- Reported process-enumeration failures explicitly instead of treating them as no running Codex Lid process in restricted environments.
+
 ## [0.2.1] - 2026-08-30
 
 - Clarified that Codex Lid controls macOS sleep but does not maintain Codex Remote transport.
@@ -35,6 +39,7 @@ All notable changes are documented here.
 - Rejected stale status/PID combinations in the menu-bar UI.
 - Added bilingual documentation, security policy, architecture notes, CI, and an MIT license.
 
-[Unreleased]: https://github.com/fukuroworksai01-stack/codex-lid/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/fukuroworksai01-stack/codex-lid/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/fukuroworksai01-stack/codex-lid/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/fukuroworksai01-stack/codex-lid/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/fukuroworksai01-stack/codex-lid/tree/v0.2.0

@@ -47,14 +47,17 @@ fi
 echo
 
 echo "Running Codex Lid processes"
-PIDS="$(/usr/bin/pgrep -x 'Codex Lid' 2>/dev/null || true)"
-if [[ -z "$PIDS" ]]; then
-  echo "  none"
-else
-  while IFS= read -r pid; do
-    /bin/ps -p "$pid" -o pid=,lstart=,comm=
-  done <<< "$PIDS"
-fi
+PIDS="$(/usr/bin/pgrep -x 'Codex Lid' 2>/dev/null)"
+PGREP_STATUS=$?
+case "$PGREP_STATUS" in
+  0)
+    while IFS= read -r pid; do
+      /bin/ps -p "$pid" -o pid=,lstart=,comm=
+    done <<< "$PIDS"
+    ;;
+  1) echo "  none" ;;
+  *) echo "  unavailable (process access was denied or failed)" ;;
+esac
 echo
 
 echo "Power source"
